@@ -9,7 +9,7 @@ on:
 
 jobs:
   update:
-    name: Update version
+    name: Get prices
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
