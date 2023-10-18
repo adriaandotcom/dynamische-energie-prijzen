@@ -1,4 +1,3 @@
-import fetch from "node-fetch";
 import cheerio from "cheerio";
 import fs from "fs";
 import core from "@actions/core";
@@ -62,27 +61,36 @@ async function login() {
     redirect: "manual",
   });
 
-  const cookies = response2.headers.raw()["set-cookie"];
+  const cookies = response2.headers.getSetCookie();
 
   return cookies;
 }
 
 async function fetchPricing(cookies) {
-  const headers = new Headers(defaultHeaders);
-
-  headers.set("Referer", "https://vrijopnaam.app/mc/65981/");
-
-  for (const cookie of cookies) {
-    headers.append("cookie", cookie);
-  }
+  const parsedCookies = cookies
+    .map((entry) => {
+      const parts = entry.split(";");
+      const cookiePart = parts[0];
+      return cookiePart;
+    })
+    .join(";");
 
   const response = await fetch(pricingUrl, {
-    headers,
+    headers: {
+      ...defaultHeaders,
+      cookie: parsedCookies,
+    },
     redirect: "follow",
   });
   const body = await response.text();
 
   const $ = cheerio.load(body);
+
+  if ($(".pricing-table tbody tr").length === 0)
+    throw new Error("No pricing data found");
+
+  if ($('.pricing-chart-title[data-title-day="tomorrow"]').length === 0)
+    throw new Error("No date found");
 
   const prices = [];
 
