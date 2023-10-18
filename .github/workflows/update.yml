@@ -1,0 +1,35 @@
+name: Update prices
+
+on:
+  schedule:
+    - cron: "5 */2 * * *"
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  update:
+    name: Update version
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Install Node.js LTS
+        uses: actions/setup-node@v3
+        with:
+          node-version: lts/*
+
+      - name: Run script
+        run: node --trace-warnings index.js
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Update pricing"
+          git push

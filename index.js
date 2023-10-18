@@ -1,6 +1,7 @@
 import fetch from "node-fetch";
 import cheerio from "cheerio";
 import fs from "fs";
+import core from "@actions/core";
 
 const loginUrl = "https://vrijopnaam.app/login/demo/";
 const pricingUrl = "https://vrijopnaam.app/mc/65981/pricing-electricity/";
@@ -121,36 +122,67 @@ async function fetchPricing(cookies) {
       .text()
       .trim();
 
+    const todayHour = parseInt(period.split(" - ")[0]);
+    const todayRowDate = new Date(`${today}T${period.split(" - ")[0]}:00:00Z`);
+    const tomorrowHour = parseInt(period.split(" - ")[1]);
+    const tomorrowRowDate = new Date(
+      `${tomorrow}T${period.split(" - ")[1]}:00:00Z`
+    );
+
     prices.push(
       {
-        date: new Date(`${today}T${period.split(" - ")[0]}:00:00Z`),
+        iso: todayRowDate,
+        date: todayRowDate.toISOString().split("T")[0],
+        hour: todayHour,
         price: parseFloat(todayPrice.replace(",", ".")),
       },
       {
-        date: new Date(`${tomorrow}T${period.split(" - ")[0]}:00:00Z`),
+        iso: tomorrowRowDate,
+        date: tomorrowRowDate.toISOString().split("T")[0],
+        hour: tomorrowHour,
         price: parseFloat(tomorrowPrice.replace(",", ".")),
       }
     );
   });
 
   // Sort by date
-  prices.sort((a, b) => a.date - b.date);
+  prices.sort((a, b) => a.iso - b.iso);
 
   return prices;
 }
 
-async function main() {
+try {
   const cookies = await login();
   const pricingData = await fetchPricing(cookies);
+
+  // get last price from prices.json
+  const lastPriceJson = JSON.parse(
+    fs.readFileSync("./prices.json")
+  ).prices.slice(-1)[0];
+  const lastPriceNew = pricingData.slice(-1)[0];
+
+  const didChange =
+    new Date(lastPriceJson.iso).getTime() !==
+    new Date(lastPriceNew.iso).getTime();
+
+  const updated_at = new Date();
   const json = {
     source: "Vrij op naam",
     description:
       "All-in-prijs: dit is de kale inkoopprijs zoals deze op de stroombeurs geldt, plus de inkoopvergoeding, energiebelasting en ODE (1ste staffel), inclusief btw. Je kunt bij 'Mijn gegevens' de prijsweergave aanpassen.",
-    updated_at: new Date(),
+    updated_at,
+    currency: "EUR",
     prices: pricingData,
   };
 
-  fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2));
+  if (didChange) {
+    fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2));
+    fs.writeFileSync("./prices.min.json", JSON.stringify(json));
+  } else {
+    console.log("No new price data available");
+    core.notice("No new price data available");
+  }
+} catch (error) {
+  console.error(error);
+  core.error(error.message);
 }
-
-main();
