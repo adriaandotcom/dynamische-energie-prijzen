@@ -36,11 +36,15 @@ const defaultHeaders = {
 async function login() {
   const response = await fetch(loginUrl, {
     headers: defaultHeaders,
-    redirect: "manual",
   });
   const body = await response.text();
   const $ = cheerio.load(body);
   const csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+
+  const password = $(".section-form.demo-user-page .centered b")
+    .first()
+    .text()
+    .trim();
 
   const headers = {
     ...defaultHeaders,
@@ -49,7 +53,7 @@ async function login() {
     Cookie: `csrftoken=${csrfToken}`,
   };
 
-  const postData = `csrfmiddlewaretoken=${csrfToken}&code=regenachtig&show_dynamic_pricing=on&username=&password=`;
+  const postData = `csrfmiddlewaretoken=${csrfToken}&code=${password}&show_dynamic_pricing=on&username=&password=`;
 
   // Wait 500ms before sending the login request
   await new Promise((resolve) => setTimeout(resolve, 500));
@@ -89,8 +93,14 @@ async function fetchPricing(cookies) {
   if ($(".pricing-table tbody tr").length === 0)
     throw new Error("No pricing data found");
 
-  if ($('.pricing-chart-title[data-title-day="tomorrow"]').length === 0)
-    throw new Error("No date found");
+  const hasTomorrow = $(
+    '.pricing-chart-title[data-title-day="tomorrow"]'
+  ).length;
+  const hasYesterday = $(
+    '.pricing-chart-title[data-title-day="yesterday"]'
+  ).length;
+
+  if (!hasTomorrow && !hasYesterday) throw new Error("No date found");
 
   const prices = [];
 
@@ -100,10 +110,13 @@ async function fetchPricing(cookies) {
         Morgen - do 19 oktober 2023
     </div> */
 
-  const tomorrowElement = $(
-    '.pricing-chart-title[data-title-day="tomorrow"] .pricing-chart-default'
+  const daySlug = hasTomorrow ? "tomorrow" : "yesterday";
+
+  const dayElement = $(
+    `.pricing-chart-title[data-title-day="${daySlug}"] .pricing-chart-default`
   )
     .text()
+    .trim()
     .split(" - ")[1]
     .trim()
     .split(" ")
@@ -111,10 +124,14 @@ async function fetchPricing(cookies) {
     .join(" ");
 
   // convert 19 oktober 2023 to 2023-10-19
-  const [day, month, year] = tomorrowElement.split(" ");
-  const tomorrowDate = new Date(
+  const [day, month, year] = dayElement.split(" ");
+  const currentDate = new Date(
     `${year}-${dutchMonths.indexOf(month) + 1}-${day}`
   );
+  const tomorrowDate = hasTomorrow
+    ? new Date(currentDate.getTime())
+    : new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+
   const todayDate = new Date(tomorrowDate.getTime() - 24 * 60 * 60 * 1000);
 
   const today = todayDate.toISOString().split("T")[0];
@@ -192,5 +209,5 @@ try {
   }
 } catch (error) {
   console.error(error);
-  core.error(error.message);
+  core.setFailed(error.message);
 }
