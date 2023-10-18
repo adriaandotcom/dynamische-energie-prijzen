@@ -201,8 +201,8 @@ try {
   };
 
   if (didChange) {
-    fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2));
-    fs.writeFileSync("./prices.min.json", JSON.stringify(json));
+    fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2) + "\n");
+    fs.writeFileSync("./prices.min.json", JSON.stringify(json) + "\n");
   } else {
     console.log("No new price data available");
     core.notice("No new price data available");
