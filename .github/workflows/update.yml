@@ -28,7 +28,12 @@ jobs:
       - name: Run script
         run: node --trace-warnings index.js
 
+      - name: Check for changes
+        id: git-diff
+        run: git diff --exit-code || echo "has-changed=true" >> $GITHUB_OUTPUT
+
       - name: Commit and push changes
+        if: steps.git-diff.outputs.has-changed == 'true'
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
