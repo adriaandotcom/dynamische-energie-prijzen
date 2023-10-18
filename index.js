@@ -169,7 +169,7 @@ try {
   const json = {
     source: "Vrij op naam",
     description:
-      "All-in-prijs: dit is de kale inkoopprijs zoals deze op de stroombeurs geldt, plus de inkoopvergoeding, energiebelasting en ODE (1ste staffel), inclusief btw. Je kunt bij 'Mijn gegevens' de prijsweergave aanpassen.",
+      "All-in-prijs: dit is de kale inkoopprijs zoals deze op de stroombeurs geldt, plus de inkoopvergoeding, energiebelasting en ODE (1ste staffel), inclusief btw.",
     updated_at,
     currency: "EUR",
     prices: pricingData,
