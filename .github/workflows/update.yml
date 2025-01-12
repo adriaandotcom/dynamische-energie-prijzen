@@ -3,7 +3,7 @@ name: Update prices
 on:
   workflow_dispatch:
   schedule:
-    - cron: "10,50 12 * * *"
+    - cron: "20 12,13 * * *"
   push:
     branches:
       - main
