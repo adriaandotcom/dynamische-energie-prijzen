@@ -1,6 +1,7 @@
 name: Update prices
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "10,50 12 * * *"
   push:
