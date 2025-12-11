@@ -22,7 +22,7 @@ const dutchMonths = [
 
 const defaultHeaders = {
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
   Accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.7,nl;q=0.3",
@@ -33,56 +33,74 @@ const defaultHeaders = {
   Connection: "keep-alive",
 };
 
-async function login() {
-  const response = await fetch(loginUrl, {
-    headers: defaultHeaders,
+const parseCookies = (entries) => {
+  if (!entries || !entries.length) return "";
+
+  const jar = new Map();
+  entries.forEach((entry) => {
+    const [name, value] = entry.split(";")[0].split("=");
+    if (name && value) jar.set(name.trim(), value.trim());
   });
+
+  return Array.from(jar.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+};
+
+async function login() {
+  const response = await fetch(loginUrl, { headers: defaultHeaders });
   const body = await response.text();
   const $ = cheerio.load(body);
   const csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+  const initialCookies = response.headers.getSetCookie();
 
-  const password = $(".section-form.demo-user-page .centered b")
+  const passwordFromPage = $(".section-form.demo-user-page .centered b")
     .first()
     .text()
     .trim();
 
+  const password =
+    passwordFromPage || process.env.DEMO_PASSWORD || "stormachtig";
+
+  const cookieHeader = parseCookies(initialCookies);
   const headers = {
     ...defaultHeaders,
     Referer: loginUrl,
     "Content-Type": "application/x-www-form-urlencoded",
-    Cookie: `csrftoken=${csrfToken}`,
+    Cookie: `${cookieHeader}; csrftoken=${csrfToken}`,
   };
 
-  const postData = `csrfmiddlewaretoken=${csrfToken}&code=${password}&show_dynamic_pricing=on&username=&password=`;
+  const postData = new URLSearchParams({
+    csrfmiddlewaretoken: csrfToken,
+    code: password,
+    show_dynamic_pricing: "on",
+    username: "",
+    password: "",
+  });
 
-  // Wait 500ms before sending the login request
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const response2 = await fetch(loginUrl, {
     method: "POST",
-    headers: headers,
-    body: postData,
+    headers,
+    body: postData.toString(),
     redirect: "manual",
   });
 
-  const cookies = response2.headers.getSetCookie();
+  const loginCookies = response2.headers.getSetCookie();
+  const mergedCookies = parseCookies([
+    ...(initialCookies || []),
+    ...(loginCookies || []),
+  ]);
 
-  return cookies;
+  return mergedCookies;
 }
 
-async function fetchPricing(cookies) {
-  const parsedCookies = cookies
-    .map((entry) => {
-      const parts = entry.split(";");
-      const cookiePart = parts[0];
-      return cookiePart;
-    })
-    .join(";");
-
+async function fetchPricing(cookieHeader) {
   const response = await fetch(pricingUrl, {
     headers: {
       ...defaultHeaders,
-      cookie: parsedCookies,
+      Cookie: cookieHeader,
     },
     redirect: "follow",
   });
@@ -180,15 +198,15 @@ try {
   const cookies = await login();
   const pricingData = await fetchPricing(cookies);
 
-  // get last price from prices.json
-  const lastPriceJson = JSON.parse(
-    fs.readFileSync("./prices.json")
-  ).prices.slice(-1)[0];
-  const lastPriceNew = pricingData.slice(-1)[0];
+  let previousPrices = [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync("./prices.json"));
+    previousPrices = parsed.prices || [];
+  } catch (_e) {}
 
-  const didChange =
-    new Date(lastPriceJson.iso).getTime() !==
-    new Date(lastPriceNew.iso).getTime();
+  const sameData =
+    previousPrices.length === pricingData.length &&
+    JSON.stringify(previousPrices) === JSON.stringify(pricingData);
 
   const updated_at = new Date();
   const json = {
@@ -200,14 +218,12 @@ try {
     prices: pricingData,
   };
 
-  if (didChange) {
+  if (sameData) {
+    core.notice("Prices unchanged; files left intact");
+  } else {
     fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2) + "\n");
     fs.writeFileSync("./prices.min.json", JSON.stringify(json) + "\n");
-  } else {
-    console.log("No new price data available");
-    core.notice("No new price data available");
   }
 } catch (error) {
-  console.error(error);
   core.setFailed(error.message);
 }
