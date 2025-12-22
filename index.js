@@ -59,14 +59,19 @@ async function login() {
   const initialCookies = response.headers.getSetCookie();
   console.log(`Initial cookies: ${initialCookies.length} set`);
 
-  const passwordFromPage = $(".section-form.demo-user-page .centered b")
+  const passwordFromPage = $(".centered b")
+    .filter((i, el) => {
+      const text = $(el).text().trim();
+      return text.length > 5 && text.length < 20;
+    })
     .first()
     .text()
     .trim();
 
   const password =
     passwordFromPage || process.env.DEMO_PASSWORD || "stormachtig";
-  console.log(`Password source: ${passwordFromPage ? "page" : "fallback"}`);
+  console.log(`Password extracted from page: "${passwordFromPage}"`);
+  console.log(`Password to use: "${password}"`);
 
   const cookieHeader = parseCookies(initialCookies);
   const headers = {
