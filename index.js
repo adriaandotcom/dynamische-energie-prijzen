@@ -48,11 +48,16 @@ const parseCookies = (entries) => {
 };
 
 async function login() {
+  console.log("Starting login process...");
   const response = await fetch(loginUrl, { headers: defaultHeaders });
+  console.log(`Login page response: ${response.status} ${response.statusText}`);
   const body = await response.text();
+  console.log(`Login page body length: ${body.length} chars`);
   const $ = cheerio.load(body);
   const csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+  console.log(`CSRF token found: ${csrfToken ? "yes" : "no"}`);
   const initialCookies = response.headers.getSetCookie();
+  console.log(`Initial cookies: ${initialCookies.length} set`);
 
   const passwordFromPage = $(".section-form.demo-user-page .centered b")
     .first()
@@ -61,6 +66,7 @@ async function login() {
 
   const password =
     passwordFromPage || process.env.DEMO_PASSWORD || "stormachtig";
+  console.log(`Password source: ${passwordFromPage ? "page" : "fallback"}`);
 
   const cookieHeader = parseCookies(initialCookies);
   const headers = {
@@ -86,17 +92,33 @@ async function login() {
     body: postData.toString(),
     redirect: "manual",
   });
+  console.log(
+    `Login POST response: ${response2.status} ${response2.statusText}`
+  );
+  const location = response2.headers.get("location");
+  if (location) console.log(`Login redirect location: ${location}`);
+  const loginBody = await response2.text();
+  console.log(`Login POST body length: ${loginBody.length} chars`);
+  const $2 = cheerio.load(loginBody);
+  const hasError = $2(".error, .alert-error, .form-error").length > 0;
+  if (hasError) {
+    const errorText = $2(".error, .alert-error, .form-error").text().trim();
+    console.log(`Login error detected: ${errorText}`);
+  }
 
   const loginCookies = response2.headers.getSetCookie();
+  console.log(`Login cookies: ${loginCookies.length} set`);
   const mergedCookies = parseCookies([
     ...(initialCookies || []),
     ...(loginCookies || []),
   ]);
+  console.log(`Login complete, merged cookies length: ${mergedCookies.length}`);
 
   return mergedCookies;
 }
 
 async function fetchPricing(cookieHeader) {
+  console.log("Fetching pricing page...");
   const response = await fetch(pricingUrl, {
     headers: {
       ...defaultHeaders,
@@ -104,12 +126,25 @@ async function fetchPricing(cookieHeader) {
     },
     redirect: "follow",
   });
+  console.log(
+    `Pricing page response: ${response.status} ${response.statusText}`
+  );
   const body = await response.text();
+  console.log(`Pricing page body length: ${body.length} chars`);
+  console.log(`Pricing page preview: ${body.slice(0, 200)}`);
 
   const $ = cheerio.load(body);
 
-  if ($(".pricing-table tbody tr").length === 0)
+  const pricingRows = $(".pricing-table tbody tr").length;
+  console.log(`Pricing table rows found: ${pricingRows}`);
+
+  if (pricingRows === 0) {
+    const pageTitle = $("title").text();
+    const hasLoginForm = $('input[name="csrfmiddlewaretoken"]').length > 0;
+    console.log(`Page title: ${pageTitle}`);
+    console.log(`Has login form: ${hasLoginForm}`);
     throw new Error("No pricing data found");
+  }
 
   const hasTomorrow = $(
     '.pricing-chart-title[data-title-day="tomorrow"]'
@@ -117,6 +152,7 @@ async function fetchPricing(cookieHeader) {
   const hasYesterday = $(
     '.pricing-chart-title[data-title-day="yesterday"]'
   ).length;
+  console.log(`Has tomorrow: ${hasTomorrow}, has yesterday: ${hasYesterday}`);
 
   if (!hasTomorrow && !hasYesterday) throw new Error("No date found");
 
@@ -191,6 +227,9 @@ async function fetchPricing(cookieHeader) {
   // Sort by date
   prices.sort((a, b) => a.iso - b.iso);
 
+  console.log(`Extracted ${prices.length} price entries`);
+  console.log("First price:", prices[0]);
+  console.log("Last price:", prices[prices.length - 1]);
   return prices;
 }
 
@@ -219,11 +258,15 @@ try {
   };
 
   if (sameData) {
+    console.log("Prices unchanged; files left intact");
     core.notice("Prices unchanged; files left intact");
   } else {
+    console.log(`Writing ${pricingData.length} price entries to files`);
     fs.writeFileSync("./prices.json", JSON.stringify(json, null, 2) + "\n");
     fs.writeFileSync("./prices.min.json", JSON.stringify(json) + "\n");
   }
 } catch (error) {
+  console.error("Error details:", error.message);
+  console.error("Error stack:", error.stack);
   core.setFailed(error.message);
 }
