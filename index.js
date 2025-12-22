@@ -68,10 +68,11 @@ async function login() {
     .text()
     .trim();
 
-  const password =
-    passwordFromPage || process.env.DEMO_PASSWORD || "stormachtig";
+  if (!passwordFromPage) {
+    throw new Error("Password not found on login page");
+  }
+
   console.log(`Password extracted from page: "${passwordFromPage}"`);
-  console.log(`Password to use: "${password}"`);
 
   const cookieHeader = parseCookies(initialCookies);
   const headers = {
@@ -83,7 +84,7 @@ async function login() {
 
   const postData = new URLSearchParams({
     csrfmiddlewaretoken: csrfToken,
-    code: password,
+    code: passwordFromPage,
     show_dynamic_pricing: "on",
     username: "",
     password: "",
