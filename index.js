@@ -62,7 +62,7 @@ async function login() {
   const passwordFromPage = $(".centered b")
     .filter((i, el) => {
       const text = $(el).text().trim();
-      return text.length > 5 && text.length < 20;
+      return text.length >= 3 && text.length < 20;
     })
     .first()
     .text()
