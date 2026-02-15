@@ -1,7 +1,7 @@
 {
   "source": "Vrij op naam",
   "description": "All-in-prijs: dit is de kale inkoopprijs zoals deze op de stroombeurs geldt, plus de inkoopvergoeding, energiebelasting en ODE (1ste staffel), inclusief btw.",
-  "updated_at": "2026-02-14T13:35:42.057Z",
+  "updated_at": "2026-02-15T12:34:17.595Z",
   "currency": "EUR",
   "prices": [
     {
@@ -200,7 +200,7 @@
       "iso": "2026-02-15T08:00:00.000Z",
       "date": "2026-02-15",
       "hour": 8,
-      "price": 0.23464
+      "price": 0.23466
     },
     {
       "iso": "2026-02-15T09:00:00.000Z",
